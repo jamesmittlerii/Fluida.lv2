@@ -25,6 +25,60 @@ Channel Matrix Editor
 - make install # will install into ~/.lv2 ... AND/OR....
 - sudo make install # will install into /usr/lib/lv2
 
+## Windows build with MSYS2 UCRT64
+
+Open an MSYS2 UCRT64 shell and install the build dependencies:
+
+```sh
+pacman -S --needed \
+  mingw-w64-ucrt-x86_64-fluidsynth \
+  mingw-w64-ucrt-x86_64-gcc \
+  mingw-w64-ucrt-x86_64-lv2 \
+  mingw-w64-ucrt-x86_64-make \
+  mingw-w64-ucrt-x86_64-pkgconf
+```
+
+If you are building the full GUI target instead of the mod-host/nogui target,
+install Cairo as well:
+
+```sh
+pacman -S --needed mingw-w64-ucrt-x86_64-cairo
+```
+
+Clone the repository, initialize the submodules, and build the Windows LV2
+bundle for mod-host:
+
+```sh
+git submodule update --init --recursive
+make TARGET=Windows LIB_EXT=dll STRIP=strip mod
+```
+
+The `STRIP=strip` override is needed in UCRT64 because the default
+`x86_64-w64-mingw32-strip` executable may not be present.
+
+The generated bundle is written to `bin/Fluida.lv2`. To install it for the
+current user:
+
+```sh
+mkdir -p ~/.lv2
+rm -rf ~/.lv2/Fluida.lv2
+cp -R bin/Fluida.lv2 ~/.lv2/
+```
+
+Before launching mod-host, make sure `~/.lv2` is in the LV2 search path:
+
+```sh
+export LV2_PATH="$HOME/.lv2${LV2_PATH:+:$LV2_PATH}"
+```
+
+For a Windows build, the bundle metadata should point at the DLL:
+
+```sh
+grep -R "lv2:binary" bin/Fluida.lv2/*.ttl
+```
+
+Expected output includes `Fluida.dll`, not `Fluida.so`.
+
 ## Binary
 Checkout the latest release for binaries compatible with Linux x86_64 or Windows (64bit)
 

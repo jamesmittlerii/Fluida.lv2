@@ -120,6 +120,7 @@ all : check $(NAME)
 mod : check clean nogui
 	@mkdir -p ../bin/$(BUNDLE)
 	@cp -R ./MOD/* ../bin/$(BUNDLE)
+	$(QUIET)$(TTLUPDATE)
 	@mv ./*.$(LIB_EXT) ../bin/$(BUNDLE)
 	@if [ -f ../bin/$(BUNDLE)/$(NAME).$(LIB_EXT) ]; then \
 		$(B_ECHO) "build finish, . . . $(reset)"; \
