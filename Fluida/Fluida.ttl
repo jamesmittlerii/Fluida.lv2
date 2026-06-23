@@ -48,6 +48,15 @@ fluida:soundfont
     rdfs:label "soundfont" ;
     rdfs:range atom:Path .
 
+fluida:instrument
+    a lv2:Parameter ;
+    rdfs:label "Instrument" ;
+    rdfs:comment "Preset index in the loaded soundfont (0 = first preset)." ;
+    rdfs:range atom:Int ;
+    lv2:default 0 ;
+    lv2:minimum 0 ;
+    lv2:maximum 999 .
+
 fluida:reverb_level
     a lv2:Parameter ;
     rdfs:label "Reverb Level" ;
@@ -223,6 +232,7 @@ MIDI bindings:
     ] ;
 
     patch:writable fluida:soundfont ,
+                fluida:instrument ,
                 fluida:reverb_level ,
                 fluida:reverb_width ,
                 fluida:reverb_damp ,
@@ -238,7 +248,8 @@ MIDI bindings:
                 fluida:gain ,
                 fluida:finetuning ;
 
-    patch:readable fluida:reverb_level ,
+    patch:readable fluida:instrument ,
+                fluida:reverb_level ,
                 fluida:reverb_width ,
                 fluida:reverb_damp ,
                 fluida:reverb_size ,

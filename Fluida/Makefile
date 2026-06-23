@@ -1,5 +1,22 @@
 	
 	STRIP ?= strip
+	ECHO ?= @echo
+	B_ECHO ?= @echo
+	R_ECHO ?= @echo
+	QUIET ?= @
+	RED ?=
+	NONE ?=
+	reset ?=
+
+	# defaults when built directly from Fluida/ (e.g. chroot), not via top Makefile
+	UNAME_S := $(shell uname -s)
+	ifeq ($(UNAME_S),Linux)
+		TARGET ?= Linux
+	endif
+	ifeq ($(TARGET),Linux)
+		LIB_EXT ?= so
+	endif
+
 	# check if user is root
 	user = $(shell whoami)
 	ifeq ($(user),root)
@@ -40,23 +57,23 @@
 
 	# set compile flags
 ifeq ($(TARGET), Linux)
-	CXXFLAGS += -D_FORTIFY_SOURCE=2 -I. -I./dsp -I./plugin -fPIC -DPIC -O2 -Wall -funroll-loops \
+	CXXFLAGS += -D_FORTIFY_SOURCE=2 -I. -I./dsp -I./plugin -I$(SCALA_DIR) -fPIC -DPIC -O2 -Wall -funroll-loops \
 	-fstack-protector -ffast-math -fomit-frame-pointer -fstrength-reduce \
-	`pkg-config --cflags --libs fluidsynth` \
+	`pkg-config --cflags fluidsynth` \
 	-fdata-sections -Wl,--gc-sections -Wl,-z,relro,-z,now -Wl,--exclude-libs,ALL $(SSE_CFLAGS)
 
 	CFLAGS += -D_FORTIFY_SOURCE=2 -fPIC -DPIC -O2 -Wall \
 	-fstack-protector -ffast-math -fomit-frame-pointer -fstrength-reduce \
 	-fdata-sections -Wl,--gc-sections -Wl,-z,relro,-z,now -Wl,--exclude-libs,ALL $(SSE_CFLAGS)
 
-	LDFLAGS += -I. -I$(SCALA_DIR) -lm -pthread -lpthread -shared -lm -Wl,-z,noexecstack -Wl,--no-undefined \
-	-fvisibility=hidden `pkg-config --cflags --libs fluidsynth`
+	LDFLAGS += -I. -I$(SCALA_DIR) -shared -lm -pthread -lpthread -Wl,-z,noexecstack -Wl,--no-undefined \
+	-fvisibility=hidden `pkg-config --libs fluidsynth`
 
 	GUI_LDFLAGS +=  -I$(HEADER_DIR) -Wl,-z,noexecstack -Wl,--no-undefined -fvisibility=hidden \
 	-L. $(LIB_DIR)libxputty.a -shared `pkg-config --cflags --libs cairo x11` -lm  -Wl,-z,nodelete \
 	-pthread -lpthread
 else ifeq ($(TARGET), Windows)
-	CXXFLAGS += -D_FORTIFY_SOURCE=2 -I. -I./dsp -I./plugin -fPIC -DPIC -O2 -Wall -funroll-loops \
+	CXXFLAGS += -D_FORTIFY_SOURCE=2 -I. -I./dsp -I./plugin -I$(SCALA_DIR) -fPIC -DPIC -O2 -Wall -funroll-loops \
 	-fstack-protector -ffast-math -fomit-frame-pointer -fstrength-reduce \
 	`$(PKGCONFIG) $(PKGCONFIG_FLAGS)  --cflags --libs fluidsynth` \
 	-fdata-sections -Wl,--gc-sections -Wl,--exclude-libs,ALL $(SSE_CFLAGS)
@@ -166,7 +183,7 @@ $(NAME) :
 
 nogui :
 	@$(B_ECHO) "Compiling $(NAME).$(LIB_EXT) $(reset)"
-	$(QUIET)$(CXX) -std=c++11  $(CXXFLAGS) $(OBJECTS) $(LDFLAGS) -o $(NAME).$(LIB_EXT)
+	$(QUIET)$(CXX) -std=c++11 -shared $(CXXFLAGS) $(OBJECTS) $(LDFLAGS) -o $(NAME).$(LIB_EXT)
 	$(QUIET)$(STRIP) -s -x -X -R .comment -R .note.ABI-tag $(NAME).$(LIB_EXT)
 
 doc:

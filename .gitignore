@@ -1,6 +1,9 @@
 # Prerequisites
 *.d
 
+bin
+libxputty
+
 # Compiled Object files
 *.slo
 *.lo

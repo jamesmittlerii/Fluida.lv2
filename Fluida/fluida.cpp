@@ -145,6 +145,7 @@ enum {
     GET_CHANNEL_LIST       = 1<<10,
     GET_VELOCITY           = 1<<11,
     GET_FINETUNING         = 1<<12,
+    GET_INSTRUMENT         = 1<<13,
 };
 
 typedef struct {
@@ -252,6 +253,7 @@ private:
     inline void send_all_controller_state();
     inline void send_instrument_state();
     inline void send_next_instrument_state();
+    inline void apply_current_instrument();
     inline void do_non_rt_work_f();
     inline void non_rt_finish_f();
     inline void store_ctrl_values(LV2_State_Store_Function store, 
@@ -513,6 +515,14 @@ void Fluida_::send_filebrowser_state() {
     }
 }
 
+void Fluida_::apply_current_instrument() {
+    if (xsynth.instruments.empty()) return;
+    if (current_instrument < 0 || current_instrument >= (int)xsynth.instruments.size())
+        current_instrument = 0;
+    xsynth.set_instrument_on_channel(channel, current_instrument);
+    instrument_list[channel] = current_instrument;
+}
+
 void Fluida_::send_instrument_state() {
     FluidaLV2URIs* uris = &this->uris;
     sflist_counter = 0;
@@ -624,6 +634,7 @@ void Fluida_::send_controller_state() {
         flags &= ~SET_GAIN;
     }
     if (flags & SET_INSTRUMENT) {
+        write_int_value(uris->fluida_instrument, (float)current_instrument);
         lv2_atom_forge_frame_time(&forge, 0);
         write_set_instrument(&forge, uris, current_instrument);
         flags &= ~SET_INSTRUMENT;
@@ -673,6 +684,7 @@ void Fluida_::send_all_controller_state() {
     }
     write_float_value(uris->fluida_tuning, (float)tuning);
 
+    write_int_value(uris->fluida_instrument, (float)current_instrument);
     lv2_atom_forge_frame_time(&forge, 0);
     write_set_instrument(&forge, uris, current_instrument);
 }
@@ -749,6 +761,13 @@ void Fluida_::retrieve_ctrl_values(const LV2_Atom_Object* obj) {
         float* val = (float*)LV2_ATOM_BODY(value);
         finetuning = (*val);
         get_flags |= GET_FINETUNING;
+    } else if (((LV2_Atom_URID*)property)->body == uris->fluida_instrument) {
+        int* val = (int*)LV2_ATOM_BODY(value);
+        if (*val != current_instrument) {
+            current_instrument = (*val);
+            get_flags |= GET_INSTRUMENT;
+            flags |= SET_INSTRUMENT | SEND_CHANNEL_LIST;
+        }
     }
 }
 
@@ -821,13 +840,14 @@ void Fluida_::run_dsp_(uint32_t n_samples) {
                 if (value) {
                     int* uri = (int*)LV2_ATOM_BODY(value);
                     current_instrument = (*uri);
-                    xsynth.synth_pgm_changed(0,(*uri));
-                    for (int i=0;i<16;i++) {
-                        instrument_list[i] = xsynth.get_instrument_for_channel(i);
-                        //fprintf(stderr, "channel %i instrument %i\n", i, instrument_list[i]);
+                    get_flags |= GET_INSTRUMENT;
+                    flags |= SET_INSTRUMENT | SEND_CHANNEL_LIST;
+                    doit = 1;
+                    if (use_worker.load(std::memory_order_acquire)) {
+                        schedule->schedule_work(schedule->handle, sizeof(int), &doit);
+                    } else {
+                        flworker.cv.notify_one();
                     }
-                    flags |= SEND_CHANNEL_LIST;
-                    send_controller_state();
                 }
             } else if (obj->body.otype == uris->fluida_state) {
                 const LV2_Atom*  value = read_set_gui(uris, obj);
@@ -945,11 +965,8 @@ void Fluida_::run_dsp_(uint32_t n_samples) {
 void Fluida_::do_non_rt_work_f() {
     if (get_flags & GET_SOUNDFONT) {
         if (xsynth.load_soundfont(soundfont.data()) == 0) {
-            if (current_instrument < (int)xsynth.instruments.size()) {
-                xsynth.synth_pgm_changed(channel,current_instrument);
-            } else {
-                current_instrument = 0;
-            }
+            if (!(get_flags & GET_CHANNEL_LIST))
+                get_flags |= GET_INSTRUMENT;
             flags |= SEND_SOUNDFONT | SEND_INSTRUMENTS;
         } else {
             soundfont.clear();
@@ -1000,8 +1017,12 @@ void Fluida_::do_non_rt_work_f() {
     if(get_flags & GET_GAIN) {
         xsynth.set_gain();
     }
-    if(get_flags & GET_FINETUNING) {
+    if (get_flags & GET_FINETUNING) {
         xsynth.finetune(finetuning);
+    }
+    if (get_flags & GET_INSTRUMENT) {
+        apply_current_instrument();
+        get_flags &= ~GET_INSTRUMENT;
     }
     if(get_flags & GET_TUNING) {
         if (tuning < 1.0) xsynth.setup_12edo_tuning(100.0);
@@ -1379,7 +1400,7 @@ LV2_State_Status Fluida_::restore_state(LV2_Handle instance,
         if (*((int *)value) != self->current_instrument) {
             self->flags |= SET_INSTRUMENT;
             self->current_instrument =  *((int *)value);
-            self->xsynth.synth_pgm_changed(self->channel, self->current_instrument);
+            self->get_flags |= GET_INSTRUMENT;
         }
     }
 

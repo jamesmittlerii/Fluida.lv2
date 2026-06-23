@@ -48,6 +48,15 @@ fluida:soundfont
     rdfs:label "soundfont" ;
     rdfs:range atom:Path .
 
+fluida:instrument
+    a lv2:Parameter ;
+    rdfs:label "Instrument" ;
+    rdfs:comment "Preset index in the loaded soundfont (0 = first preset)." ;
+    rdfs:range atom:Int ;
+    lv2:default 0 ;
+    lv2:minimum 0 ;
+    lv2:maximum 999 .
+
 fluida:reverb_level
     a lv2:Parameter ;
     rdfs:label "Reverb Level" ;
@@ -153,7 +162,7 @@ fluida:channel_pressure
 
 
     lv2:minorVersion 0;
-    lv2:microVersion 1;
+    lv2:microVersion 2;
 
     mod:brand "Synth" ;
     mod:label "Fluida" ;
@@ -196,6 +205,7 @@ Fluidsynth as LV2 plugin
     ] ;
 
     patch:writable fluida:soundfont ,
+                fluida:instrument ,
                 fluida:reverb_level ,
                 fluida:reverb_width ,
                 fluida:reverb_damp ,
@@ -209,7 +219,8 @@ Fluidsynth as LV2 plugin
                 fluida:chorus_on ,
                 fluida:channel_pressure ;
 
-    patch:readable fluida:reverb_level ,
+    patch:readable fluida:instrument ,
+                fluida:reverb_level ,
                 fluida:reverb_width ,
                 fluida:reverb_damp ,
                 fluida:reverb_size ,
